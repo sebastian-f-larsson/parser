@@ -1,0 +1,10 @@
+; comment
+; another comment
+
+id: 1
+name: "npc name"
+health: 100
+ap: 3
+dialog: [1,2,3]
+quest: [1,33,689]
+str: ["a", "b"]
