@@ -1,0 +1,3 @@
+example/example
+lib/*.a
+lib/*.o

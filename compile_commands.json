@@ -1,0 +1,20 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-ggdb",
+      "-O2",
+      "-Iinclude/",
+      "-o",
+      "bin/parser",
+      "src/buffer.c"
+    ],
+    "directory": "/home/sebastian/dev/parser",
+    "file": "/home/sebastian/dev/parser/src/buffer.c",
+    "output": "/home/sebastian/dev/parser/bin/parser"
+  }
+]
