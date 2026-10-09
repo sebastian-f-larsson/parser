@@ -252,6 +252,14 @@ int parser_get_string_array(const Parser *p, const char *field, char ***out, siz
   return -1;
 }
 
+static char *unquote_string(char *str) {
+  char *l_unquoted = ltrim_c(str);
+  char *r_unquoted = rtrim_c(l_unquoted);
+
+  free(l_unquoted);
+  return r_unquoted;
+}
+
 int parse(Parser *p, const char *file_path) {
   FILE *fp = NULL;
   char *line = NULL;
@@ -295,7 +303,9 @@ int parse(Parser *p, const char *file_path) {
         // TODO: to func
         if(trimmed[0] == '\"' && trimmed[strlen(trimmed) - 1] == '\"') {
           p->value[parser_index].type = VALUE_STRING;
-          p->value[parser_index].string = strdup(trimmed);
+          char *unquoted = unquote_string(trimmed);
+          p->value[parser_index].string = strdup(unquoted);
+          free(unquoted);
         }
         
         char *end_str = NULL;
