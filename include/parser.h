@@ -2,6 +2,8 @@
 #define LIBPARSER_H
 
 
+#include <stddef.h>
+
 typedef enum { VALUE_INT, VALUE_STRING, VALUE_ARRAY } ValueType;
 
 struct value {
