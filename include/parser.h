@@ -21,9 +21,13 @@ struct value {
   };
 };
 
+typedef struct ParserArray ParserArray;
 typedef struct Parser Parser;
 
 Parser *parser_create(void);
+ParserArray *parser_array_create(void);
+
+int parse_array(ParserArray *p, const char *file_path);
 int parse(Parser *p, const char *file_path);
 int parser_get_string_array(const Parser *p, const char *field, char ***out,
                             size_t *size);
