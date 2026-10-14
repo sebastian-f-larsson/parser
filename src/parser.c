@@ -5,10 +5,16 @@
 #include <ctype.h>
 #include "parser.h"
 
-struct Parser {
-  struct value *value;
+struct Block {
+  struct value * values;
   size_t value_size;
   size_t value_capacity;
+};
+
+struct Parser {
+  struct Block *blocks;
+  size_t block_size;
+  size_t block_capacity;
 };
 
 
@@ -22,13 +28,12 @@ Parser *parser_create(void) {
 
   return p;
 }
+static int init_parser_item(struct Block *b) {
+  b->value_capacity = 10;
+  b->value_size = 0;
+  b->values = calloc(b->value_capacity, sizeof(struct value));
 
-static int init_parser(Parser *p) {
-  p->value_capacity = 10;
-  p->value_size = 0;
-  p->value = calloc(p->value_capacity, sizeof(struct value));
-
-  if(p->value == NULL) {
+  if(b->values == NULL) {
     fprintf(stderr, "%s\n", strerror(errno));
     return -1;
   }
@@ -36,48 +41,81 @@ static int init_parser(Parser *p) {
   return 0;
 }
 
-static int resize_parser(Parser *p) {
+static int init_parser_block(Parser *p) {
+  p->block_capacity = 10;
+  p->block_size = 0;
+  p->blocks = calloc(p->block_capacity, sizeof(struct value));
 
-  p->value_capacity *= 2;
+  if(p->blocks == NULL) {
+    fprintf(stderr, "%s\n", strerror(errno));
+    return -1;
+  }
 
-  struct value *tmp = realloc(p->value, p->value_capacity * sizeof(struct value));
+  return 0;
+}
+
+static int resize_blocks(Parser *p) {
+
+  p->block_capacity *= 2;
+
+  struct Block *tmp = realloc(p->blocks, p->block_capacity * sizeof(struct Block));
 
   if(tmp == NULL) {
     fprintf(stderr, "%s\n", strerror(errno));
     return -1;
   }
 
-  p->value = tmp;
+  p->blocks = tmp;
+
+  return 0;
+}
+
+
+static int resize_items(struct Block *b) {
+
+  b->value_capacity *= 2;
+
+  struct value *tmp = realloc(b->values, b->value_capacity * sizeof(struct value));
+
+  if(tmp == NULL) {
+    fprintf(stderr, "%s\n", strerror(errno));
+    return -1;
+  }
+
+  b->values = tmp;
 
   return 0;
 }
 
 void destroy_parser(Parser **p) {
-  for(size_t i = 0; i < (*p)->value_size; i++) {
-    switch((*p)->value[i].type) {
+  for(size_t b = 0; b < (*p)->block_size; b++) {
+
+  for(size_t i = 0; i < (*p)->blocks[b].value_size; i++) {
+    switch((*p)->blocks[b].values[i].type) {
       case VALUE_INT:
         break;
       case VALUE_STRING:
-        free((*p)->value[i].string);
+        free((*p)->blocks[b].values[i].string);
         break;
       case VALUE_ARRAY: 
-        for(size_t j = 0; j < (*p)->value[i].array.count; j++) {
-          if((*p)->value[i].array.items[j].type == VALUE_STRING) {
-            free((*p)->value[i].array.items[j].string);
+        for(size_t j = 0; j < (*p)->blocks[b].values[i].array.count; j++) {
+          if((*p)->blocks[b].values[i].array.items[j].type == VALUE_STRING) {
+            free((*p)->blocks[b].values[i].array.items[j].string);
           }
         }
 
-        free((*p)->value[i].array.items);
+        free((*p)->blocks[b].values[i].array.items);
     }
 
-    free((*p)->value[i].field);
+    free((*p)->blocks[b].values[i].field);
   }
-
-  free((*p)->value);
+  
+  }
+  free((*p)->blocks);
   free((*p));
 }
 
-static char *ltrim_c(char *str) {
+static char *ltrim_c(const char *str) {
   size_t new_size = strlen(str) - 1;
 
   char *new_string = calloc(new_size + 1, sizeof(char));
@@ -92,7 +130,7 @@ static char *ltrim_c(char *str) {
   return new_string;
 }
 
-static char *rtrim_c(char *str) {
+static char *rtrim_c(const char *str) {
   size_t new_size = strlen(str) - 1;
 
   char *new_string = calloc(new_size + 1, sizeof(char));
@@ -107,7 +145,7 @@ static char *rtrim_c(char *str) {
   return new_string;
 }
 
-char *trim_array(char *str) {
+static char *trim_array(const char *str) {
   char *ltrim_arr = ltrim_c(str);
   char *rtrim_arr = rtrim_c(ltrim_arr);
   free(ltrim_arr);
@@ -185,10 +223,10 @@ static char *trim(char *str) {
   free(lt);
   return rt;
 }
-
+/*
 int parser_get_int(const Parser *p, const char *field, int *out) {
   for(size_t i = 0; i < p->value_size; i++) {
-    if(strcmp(p->value[i].field, field) == 0 && p->value[i].type == VALUE_INT) {
+    if(strcmp(p->values[i].field, field) == 0 && p->value[i].type == VALUE_INT) {
       (*out) = p->value[i].integer;
       return 0; 
     }
@@ -251,8 +289,8 @@ int parser_get_string_array(const Parser *p, const char *field, char ***out, siz
 
   return -1;
 }
-
-static char *unquote_string(char *str) {
+*/
+static char *unquote_string(const char *str) {
   char *l_unquoted = ltrim_c(str);
   char *r_unquoted = rtrim_c(l_unquoted);
 
@@ -264,7 +302,8 @@ int parse(Parser *p, const char *file_path) {
   FILE *fp = NULL;
   char *line = NULL;
   size_t len = 0;
-  size_t parser_index = 0;
+  size_t parser_index = 0; // TODO: rename item index
+  size_t block_index = 0;
   ssize_t read;
   fp = fopen(file_path, "r");
 
@@ -273,13 +312,29 @@ int parse(Parser *p, const char *file_path) {
     return errno;
   }
 
-  if(init_parser(p) != 0) {
-    fprintf(stderr, "unable to init parser\n");
-    return -1;
+  if(init_parser_block(p) != 0) {
+    fprintf(stderr, "unable to initialize parser block\n");
   }
-
   while((read = getline(&line, &len, fp)) != -1) {
-  
+ 
+    if(line[0] == '{') {
+      if(init_parser_item(&p->blocks[block_index]) != 0) {
+        fprintf(stderr, "unable to initialize parser item\n");
+        return -1;
+      }
+    }
+    if(line[0] == '}') {
+      p->block_size++;
+
+      if(p->block_size >= p->block_capacity) {
+        if(resize_blocks(p) != 0) {
+          return -1;
+        }
+      }
+
+      block_index++;
+    }
+
     if(line[0] == ';') {
       continue;
     }
@@ -294,7 +349,7 @@ int parse(Parser *p, const char *file_path) {
 
     while(token != NULL) {
       if(token_count == 0) {
-        p->value[parser_index].field = strdup(token);
+        p->blocks[block_index].values[parser_index].field = strdup(token);
       }
       else if(token_count == 1) {
         char *trimmed = trim(token);
@@ -302,9 +357,9 @@ int parse(Parser *p, const char *file_path) {
         // string value 
         // TODO: to func
         if(trimmed[0] == '\"' && trimmed[strlen(trimmed) - 1] == '\"') {
-          p->value[parser_index].type = VALUE_STRING;
+          p->blocks[block_index].values[parser_index].type = VALUE_STRING;
           char *unquoted = unquote_string(trimmed);
-          p->value[parser_index].string = strdup(unquoted);
+          p->blocks[block_index].values[parser_index].string = strdup(unquoted);
           free(unquoted);
         }
         
@@ -313,8 +368,8 @@ int parse(Parser *p, const char *file_path) {
         // int value
         // TODO: to func
         if(end_str != trimmed) {
-          p->value[parser_index].type = VALUE_INT;
-          p->value[parser_index].integer = number_value;
+          p->blocks[block_index].values[parser_index].type = VALUE_INT;
+          p->blocks[block_index].values[parser_index].integer = number_value;
           end_str = NULL;
         }
 
@@ -326,9 +381,9 @@ int parse(Parser *p, const char *file_path) {
           size_t internal_array_index = 0;
           size_t arr_length = length(trimmed);
 
-          p->value[parser_index].type = VALUE_ARRAY; 
-          p->value[parser_index].array.count = arr_length;
-          p->value[parser_index].array.items = calloc(arr_length, sizeof(struct value));
+          p->blocks[block_index].values[parser_index].type = VALUE_ARRAY; 
+          p->blocks[block_index].values[parser_index].array.count = arr_length;
+          p->blocks[block_index].values[parser_index].array.items = calloc(arr_length, sizeof(struct value));
 
            if(internal_token != NULL && internal_token[0] == '\"' && internal_token[strlen(internal_token) - 1] == '\"') {
             is_string_arr = true;
@@ -337,12 +392,12 @@ int parse(Parser *p, const char *file_path) {
           while(internal_token != NULL) {
             if(is_string_arr == true)  {
 
-              p->value[parser_index].array.items[internal_array_index].string = strdup(internal_token);
-              p->value[parser_index].array.items[internal_array_index].type = VALUE_STRING;
+              p->blocks[block_index].values[parser_index].array.items[internal_array_index].string = strdup(internal_token);
+              p->blocks[block_index].values[parser_index].array.items[internal_array_index].type = VALUE_STRING;
             }
             else {
-              p->value[parser_index].array.items[internal_array_index].integer = strtol(internal_token, &end_str, 10);
-              p->value[parser_index].array.items[internal_array_index].type = VALUE_INT;
+              p->blocks[block_index].values[parser_index].array.items[internal_array_index].integer = strtol(internal_token, &end_str, 10);
+              p->blocks[block_index].values[parser_index].array.items[internal_array_index].type = VALUE_INT;
             }
             internal_array_index++;
             internal_token = strtok(NULL, ",");
@@ -362,13 +417,14 @@ int parse(Parser *p, const char *file_path) {
 
       token_count++;
     }
-      p->value_size++;
+      p->blocks[block_index].value_size++;
 
-      if(p->value_size >= p->value_capacity) {
-        if(resize_parser(p) != 0) {
+      if(p->blocks[block_index].value_size >= p->blocks[block_index].value_capacity) {
+        if(resize_items(&p->blocks[block_index]) != 0) {
           return -1;
+        }
       }
-    }
+
       parser_index++;
   }
 
