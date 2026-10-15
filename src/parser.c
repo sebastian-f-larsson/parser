@@ -80,6 +80,34 @@ static int resize_parser(Parser *p)
   return 0;
 }
 
+int parser_array_find_item_index_int(const ParserArray *p, const char *field, const int value) {
+  for(size_t i = 0; i < p->block_size; i++) {
+    printf("%zu\n", i);
+    for(size_t j = 0; j < p->blocks[i].value_size; j++) {
+                 printf(
+                "block=%zu field='%s' type=%d integer=%d\n",
+                i,
+                p->blocks[i].values[j].field,
+                p->blocks[i].values[j].type,
+                p->blocks[i].values[j].integer
+            );
+      if(
+        strcmp(field, p->blocks[i].values[j].field) == 0 && 
+        value == p->blocks[i].values[j].integer &&
+        p->blocks[i].values[j].type == VALUE_INT
+      ) {
+        return i;
+      }
+    }
+  }
+
+  return -1;
+}
+
+size_t parser_array_count(const ParserArray *p) {
+  return p->block_size;
+}
+
 void destroy_parser(Parser **p)
 {
   for (size_t i = 0; i < (*p)->value_size; i++)
@@ -126,7 +154,7 @@ static int init_parser_array_item(struct Block *b) {
 static int init_parser_array_block(ParserArray *p) {
   p->block_capacity = 10;
   p->block_size = 0;
-  p->blocks = calloc(p->block_capacity, sizeof(struct value));
+  p->blocks = calloc(p->block_capacity, sizeof(struct Block));
 
   if(p->blocks == NULL) {
     fprintf(stderr, "%s\n", strerror(errno));
@@ -404,6 +432,8 @@ int parse_array(ParserArray *p, const char *file_path) {
         fprintf(stderr, "unable to initialize parser item\n");
         return -1;
       }
+      parser_index = 0;
+      continue;
     }
     if(line[0] == '}') {
       p->block_size++;
@@ -415,6 +445,7 @@ int parse_array(ParserArray *p, const char *file_path) {
       }
 
       block_index++;
+      continue;
     }
 
     if(line[0] == ';') {
@@ -430,11 +461,11 @@ int parse_array(ParserArray *p, const char *file_path) {
     token = strtok_r(line, ":", &saveptr);
 
     while(token != NULL) {
+      char *trimmed = trim(token);
       if(token_count == 0) {
-        p->blocks[block_index].values[parser_index].field = strdup(token);
+        p->blocks[block_index].values[parser_index].field = strdup(trimmed);
       }
       else if(token_count == 1) {
-        char *trimmed = trim(token);
 
         // string value 
         // TODO: to func

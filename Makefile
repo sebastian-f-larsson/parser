@@ -6,6 +6,7 @@ all:
 
 example:
 	gcc src/example.c -o example/example -Wall -Wextra -pedantic -ggdb -O2 -Iinclude/  -Llib/ -lparser
+	gcc src/example_array.c -o example/example_array -Wall -Wextra -pedantic -ggdb -O2 -Iinclude/  -Llib/ -lparser
 
 install: all
 	sudo install -d /usr/include/parser
@@ -14,7 +15,7 @@ install: all
 
 uninstall:
 	sudo rm -rf /usr/include/parser
-	sudo rm -f /usr/lib/libparser.a
+	sudo rm -f /usr/lib/libparser
 
 compile_flags:
 	bear -- make
