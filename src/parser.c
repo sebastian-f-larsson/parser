@@ -200,6 +200,7 @@ void destroy_parser_array(ParserArray **p) {
 
       free((*p)->blocks[b].values[i].field);
     }
+    free((*p)->blocks[b].values);
   }
   free((*p)->blocks);
   free((*p));
@@ -363,6 +364,36 @@ int parser_array_get_string(const ParserArray *p, const char *field,
 
   return -1;
 }
+
+int parser_array_get_array_string(const ParserArray *p, const char *field,
+                            const int index, char ***out, size_t *size) {
+  for (size_t i = 0; i < p->blocks[index].value_size; i++) {
+    if (strcmp(p->blocks[index].values[i].field, field) == 0 &&
+        p->blocks[index].values[i].type == VALUE_ARRAY) {
+
+
+  (*out) = calloc(p->blocks[index].values[i].array.count,
+                      sizeof(char *) * p->blocks[index].values[i].array.count);
+
+      if ((*out) == NULL) {
+        fprintf(stderr, "%s\n", strerror(errno));
+        return -1;
+      }
+
+      (*size) = p->blocks[index].values[i].array.count;
+      for (size_t j = 0; j < p->blocks[index].values[i].array.count; j++) {
+        char *trimmed = trim(p->blocks[index].values[i].array.items[j].string);
+        (*out)[j] = strdup(trimmed);
+      }
+
+      return 0;
+    }
+  }
+
+  return -1;
+}
+
+
 
 int parser_get_int_array(const Parser *p, const char *field, int **out,
                          size_t *size) {

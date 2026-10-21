@@ -43,6 +43,8 @@ int parser_array_get_string(const ParserArray *p, const char *field,
                             const int index, char **out);
 int parser_array_get_int(const ParserArray *p, const char *field,
                          const int index, int *out);
+int parser_array_get_array_string(const ParserArray *p, const char *field, const int index, char ***out, size_t *size);
+
 size_t parser_array_count(const ParserArray *p);
 void destroy_parser_array(ParserArray **p);
 

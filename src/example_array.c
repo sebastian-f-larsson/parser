@@ -8,8 +8,8 @@ int main(void) {
   char *name;
   int *quests = NULL;
   int health;
-  char **str_array = NULL;
-  size_t str_arr_size;
+  char **actions = NULL;
+  size_t actions_size;
 
   parse_array(p, "file_array.dat");
 
@@ -24,8 +24,19 @@ int main(void) {
 
   parser_array_get_string(p, "name", index, &name);
   parser_array_get_int(p, "health", index, &health);
+  parser_array_get_array_string(p, "str", index, &actions, &actions_size);
   printf("name: %s\n", name);
   printf("health: %d\n", health);
+  printf("actions: \n");
+  for(size_t i = 0; i < actions_size; i++) {
+    printf("\t%s\n", actions[i]);
+  }
+
+  for(size_t i = 0; i < actions_size; i++) {
+    free(actions[i]);
+  }
+
+  free(actions);
   /*  parser_get_int(p, "id", &id);
     parser_get_string(p, "name", &name);
     parser_get_int_array(p, "quest", &quests, &quest_size);
